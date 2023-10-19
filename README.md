@@ -7,13 +7,11 @@ This repository contains the implementation of the machine learning model and ex
 If you find this code useful in your research, please consider citing:
 
 ```
-@article{authorlastname2023paper,
-  title={Paper Title},
-  author={Author, A. and Coauthor, B.},
-  journal={Journal Name},
+@article{wharrie2023causal,
+  title={Causal Similarity-Based Hierarchical Bayesian Models},
+  author={Wharrie, Sophie and Kaski, Samuel},
+  journal={arXiv preprint},
   year={2023},
-  pages={xx-xx},
-  publisher={Publisher}
 }
 ```
 
@@ -253,7 +251,7 @@ Navigate through the notebook cells to visualize results, and generate the table
 
 ## Acknowledgements
 
-This project received funding from xxx.
+This study has received funding from the European Union's Horizon 2020 research and innovation programme under grant agreement No 101016775. This research has been conducted using the UK Biobank Resource under Application Number 77565.
 
 We acknowledge the following code packages and repositories that were especially useful for carrying out our research:
 - [NumPyro](https://github.com/pyro-ppl/numpyro) and [Pyro](https://github.com/pyro-ppl/pyro)
