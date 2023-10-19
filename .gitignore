@@ -1,0 +1,9 @@
+experiment_env
+data/economics/econ*_dataset*.csv
+data/economics/pwt1001.xlsx
+data/economics/WEOApr2023all.xlsx
+data/medical/data
+data/synthetic/output
+experiments/output/test
+mlruns
+__pycache__

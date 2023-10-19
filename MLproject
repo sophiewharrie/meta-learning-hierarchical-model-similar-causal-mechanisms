@@ -1,0 +1,346 @@
+name: Causal Similarity
+
+# NOTE this conda environment is for the competitive baselines, 
+# which is different to the environment for BNN baselines or our methods 
+# (which just use the local virtual env)
+conda_env: baselines/environments/env.yml
+
+entry_points:
+  # entry point for creating synthetic datasets
+  create_synthetic_dataset:
+      parameters:
+          outprefix: # prefix for the output
+            type: string
+            default: data/synthetic/output/test
+          ref_input: # prefix for the edgefile for the reference DAG
+            type: string
+            default: data_generator/example_edgefile.txt
+          seed: # random seed for reproducibility
+            type: float
+            default: 1234
+          N_train: # number of training tasks
+            type: int
+            default: 10
+          N_val: # number of validation tasks
+            type: int
+            default: 10
+          N_test: # number of test tasks
+            type: int
+            default: 10
+          M_train: # number of training (support) samples per task
+            type: int
+            default: 5
+          M_test: # number of test (query) samples per task
+            type: int
+            default: 5
+          C: # number of causal clusters
+            type: float
+            default: 2
+          sigma_ref: # variance of coefficient distributions in CAM (globally)
+            type: float
+            default: 1.0
+          sigma_group: # variance of coefficient distributions in CAM for a causal group
+            type: float
+            default: 0.1
+          sigma_task: # variance of coefficient distributions in CAM for a single task
+            type: float
+            default: 0.0001
+          sigma_noise: # variance of noise distributions in CAM
+            type: float
+            default: 0.1
+          eta_group: # bound on divergence from the reference DAG across the causal groups
+            type: float
+            default: 0.6
+          eta_task: # bound on divergence from the reference DAG within a causal group
+            type: float
+            default: 0.05
+      command: "python3 ./data_generator/main.py --outprefix {outprefix} --ref_input {ref_input} --seed {seed} --N_train {N_train} --N_val {N_val} --N_test {N_test} --M_train {M_train} --M_test {M_test} --C {C} --sigma_ref {sigma_ref} --sigma_group {sigma_group} --sigma_task {sigma_task} --sigma_noise {sigma_noise} --eta_group {eta_group} --eta_task {eta_task} --linear"
+  # entry point for running a global BNN model (complete pooling)
+  global_bnn_model:
+      parameters:
+          datafile: # path for the dataset (.csv)
+            type: string
+            default: data/synthetic/output/test_data.csv
+          outprefix: # prefix for the output
+            type: string
+            default: data/synthetic/output/test
+          task: # either regression or classification
+            type: string
+            default: regression
+          inference: # either HMC or SVI
+            type: string
+            default: SVI
+          num_samples: # number of MC samples to generate
+            type: float
+            default: 1000
+          hidden_layer_size: # dimension of hidden layers (assumes 2 hidden layers)
+            type: float
+            default: 20
+          learning_rate: # learning rate for model training (uses Adam optimiser)
+            type: float
+            default: 0.001
+          num_steps: # number of steps for model training
+            type: float
+            default: 10000
+      command: "python3 ./baselines/bnn_baselines/global_model_main.py --datafile {datafile} --outprefix {outprefix} --task {task} --inference {inference} --num_samples {num_samples} --hidden_layer_size {hidden_layer_size} --learning_rate {learning_rate} --num_steps {num_steps}"
+  # entry point for running an individual BNN model (no pooling)
+  individual_bnn_model:
+      parameters:
+          datafile: # path for the dataset (.csv)
+            type: string
+            default: data/synthetic/output/test_data.csv
+          outprefix: # prefix for the output
+            type: string
+            default: data/synthetic/output/test
+          task: # either regression or classification
+            type: string
+            default: regression
+          inference: # either HMC or SVI
+            type: string
+            default: SVI
+          num_samples: # number of MC samples to generate
+            type: float
+            default: 1000
+          hidden_layer_size: # dimension of hidden layers (assumes 2 hidden layers)
+            type: float
+            default: 20
+          learning_rate: # learning rate for model training (uses Adam optimiser)
+            type: float
+            default: 0.001
+          num_steps: # number of steps for model training
+            type: float
+            default: 10000
+      command: "python3 ./baselines/bnn_baselines/individual_model_main.py --datafile {datafile} --outprefix {outprefix} --task {task} --inference {inference} --num_samples {num_samples} --hidden_layer_size {hidden_layer_size} --learning_rate {learning_rate} --num_steps {num_steps}"
+  # entry point for running the HSML model (from https://github.com/huaxiuyao/HSML)
+  hsml_model:
+      parameters:
+          datafile: # path for the dataset (.csv)
+            type: string
+            default: data/synthetic/output/test_data.csv
+          outdir: # directory for the output, e.g. /baselines/HSML/logs/test/
+            type: string
+            default: baselines/HSML/logs/test/
+          hidden_layer_size: # dimension of hidden layers (assumes 2 hidden layers)
+            type: float
+            default: 20
+          metatrain_iterations: # number of training epochs
+            type: float
+            default: 250
+          meta_lr: # number of training epochs
+            type: float
+            default: 0.001
+          update_lr: # step size alpha for inner gradient update
+            type: float
+            default: 0.001
+          num_updates: # number of inner gradient updates during training
+            type: float
+            default: 2
+      command: "python baselines/HSML/custom_main.py --datafile {datafile} --outdir {outdir} --hidden_layer_size {hidden_layer_size} --metatrain_iterations {metatrain_iterations} --meta_lr {meta_lr} --update_lr {update_lr} --num_updates {num_updates}"
+  # entry point for running the TSA MAML model (from https://github.com/Carbonaraa/TSA-MAML)
+  tsa_maml_model:
+      parameters:
+          datafile: # path for the dataset (.csv)
+            type: string
+            default: data/synthetic/output/test_data.csv
+          outprefix: # prefix for the output
+            type: string
+            default: data/synthetic/output/test
+          num_groups: # number of causal groups
+            type: float
+            default: 2
+          task: # either regression or classification
+            type: string
+            default: regression
+          hidden_layer_size: # dimension of hidden layers (assumes 2 hidden layers)
+            type: float
+            default: 20
+          num_initial_epochs: # number of training epochs for MAML model (initialisation)
+            type: float
+            default: 50
+          num_main_epochs: # number of training epochs for TSA-MAML model (main)
+            type: float
+            default: 50
+          meta_learning_rate_initial: # learning rate for outer (meta) MAML model (initialisation)
+            type: float
+            default: 0.001
+          base_learning_rate_initial: # learning rate for inner (base) MAML model (initialisation)
+            type: float
+            default: 0.001
+          meta_learning_rate_main: # learning rate for outer (meta) TSA-MAML model (main)
+            type: float
+            default: 0.001
+          base_learning_rate_main: # learning rate for inner (base) TSA-MAML model (main)
+            type: float
+            default: 0.001
+          num_base_steps: # number of SGD steps for base learner
+            type: float
+            default: 2
+      command: "python3 baselines/TSA-MAML/our_tsa_maml.py --datafile {datafile} --outprefix {outprefix} --num_groups {num_groups} --task {task} --hidden_layer_size {hidden_layer_size} --num_initial_epochs {num_initial_epochs} --num_main_epochs {num_main_epochs} --meta_learning_rate_initial {meta_learning_rate_initial} --base_learning_rate_initial {base_learning_rate_initial} --meta_learning_rate_main {meta_learning_rate_main} --base_learning_rate_main {base_learning_rate_main} --num_base_steps {num_base_steps}"
+  # entry point for running the Bayesian meta-learning baseline model
+  bayesian_metalearner_model:
+      parameters:
+          datafile: # path for the dataset (.csv)
+            type: string
+            default: data/synthetic/output/test_data.csv
+          outprefix: # prefix for the output
+            type: string
+            default: data/synthetic/output/test
+          task: # either regression or classification
+            type: string
+            default: regression
+          hidden_layer_size: # dimension of hidden layers (assumes 2 hidden layers)
+            type: float
+            default: 20
+          num_epochs: # number of training epochs
+            type: float
+            default: 50
+          meta_learning_rate: # learning rate for outer (meta) model (used in meta-training)
+            type: float
+            default: 0.001
+          base_learning_rate: # learning rate for inner (base) model (used in both meta-training and meta-testing)
+            type: float
+            default: 0.0001
+          num_base_steps: # number of SGD steps for base learner
+            type: float
+            default: 2
+          prior_sigma_1: # prior sigma 1 on the mixture prior distribution
+            type: float
+            default: 0.1
+          prior_sigma_2: # prior sigma 2 on the mixture prior distribution
+            type: float
+            default: 0.4
+          prior_pi: # pi on the scaled mixture prior
+            type: float
+            default: 1.0
+      command: "python3 baselines/bayesian_metalearner/bayesian_metalearner_main.py --datafile {datafile} --outprefix {outprefix} --task {task} --hidden_layer_size {hidden_layer_size} --num_epochs {num_epochs} --meta_learning_rate {meta_learning_rate} --base_learning_rate {base_learning_rate} --num_base_steps {num_base_steps} --prior_sigma_1 {prior_sigma_1} --prior_sigma_2 {prior_sigma_2} --prior_pi {prior_pi}"
+  # entry point for our method with known causal structure
+  our_method_known_causal_structure:
+      parameters:
+          datafile: # path for the dataset (.csv)
+            type: string
+            default: data/synthetic/output/test_data.csv
+          simfile: # path for the file containing causal distances of task pairs (.csv)
+            type: string
+            default: data/synthetic/output/test_causal_sim.csv
+          metafile: # path for the file containing causal similarities of tasks (.csv) (only needed for ground truth distance)
+            type: string
+            default: data/synthetic/output/test_task_metadata.csv
+          num_groups: # number of causal groups
+            type: float
+            default: 2
+          causal_distance: # one of ground_truth,SID,SHD,OD,ID,TOD_alphaxx,TID_alphaxx (where xx is a value for alpha)
+            type: string
+            default: ground_truth
+          outprefix: # prefix for the output
+            type: string
+            default: data/synthetic/output/test
+          task: # either regression or classification
+            type: string
+            default: regression
+          hidden_layer_size: # dimension of hidden layers (assumes 2 hidden layers)
+            type: float
+            default: 20
+          num_initial_epochs: # number of initial training epochs
+            type: float
+            default: 20
+          num_main_epochs: # (maximum) number of training epochs
+            type: float
+            default: 200
+          patience: # how many increases in validation loss to go before early stopping of training for main model (to prevent overfitting)
+            type: float
+            default: 3
+          meta_learning_rate_initial: # learning rate for outer (meta) model (used in meta-training) for initial model
+            type: float
+            default: 0.001
+          base_learning_rate_initial: # learning rate for inner (base) model (used in both meta-training and meta-testing) for initial model
+            type: float
+            default: 0.0001
+          meta_learning_rate_global_main: # learning rate for global (meta) model (used in meta-training) for main model
+            type: float
+            default: 0.001
+          meta_learning_rate_group_main: # learning rate for group (meta) models (used in meta-training) for main model
+            type: float
+            default: 0.001
+          base_learning_rate_main: # learning rate for inner (base) model (used in both meta-training and meta-testing) for main model
+            type: float
+            default: 0.0001
+          num_base_steps: # number of SGD steps for base learner
+            type: float
+            default: 2
+          prior_sigma_1: # prior sigma 1 on the mixture prior distribution
+            type: float
+            default: 0.1
+          prior_sigma_2: # prior sigma 2 on the mixture prior distribution
+            type: float
+            default: 0.4
+          prior_pi: # pi on the scaled mixture prior
+            type: float
+            default: 1.0
+          lambda: # pi on the scaled mixture prior
+            type: float
+            default: 0.01
+      command: "python3 model/main.py --datafile {datafile} --simfile {simfile} --metafile {metafile} --num_groups {num_groups} --causal_distance {causal_distance} --outprefix {outprefix} --task {task} --hidden_layer_size {hidden_layer_size} --num_initial_epochs {num_initial_epochs} --num_main_epochs {num_main_epochs} --patience {patience} --meta_learning_rate_initial {meta_learning_rate_initial} --base_learning_rate_initial {base_learning_rate_initial} --meta_learning_rate_global_main {meta_learning_rate_global_main} --meta_learning_rate_group_main {meta_learning_rate_group_main} --base_learning_rate_main {base_learning_rate_main} --num_base_steps {num_base_steps} --prior_sigma_1 {prior_sigma_1} --prior_sigma_2 {prior_sigma_2} --prior_pi {prior_pi} --lambda {lambda}"
+  # entry point for our method with unknown causal structure
+  our_method_unknown_causal_structure:
+      parameters:
+          datafile: # path for the dataset (.csv)
+            type: string
+            default: data/synthetic/output/test_data.csv
+          num_groups: # number of causal groups
+            type: float
+            default: 2
+          inference_type: # which type of causal inference approach to use (observational or interventional)
+            type: string
+            default: interventional
+          interventional_option: # which type of interventional proxy to use (for ablation studies)
+            type: float
+            default: 4 # use default of 4 for reproducing main experiment
+          outprefix: # prefix for the output
+            type: string
+            default: data/synthetic/output/test
+          task: # either regression or classification
+            type: string
+            default: regression
+          hidden_layer_size: # dimension of hidden layers (assumes 2 hidden layers)
+            type: float
+            default: 20
+          num_initial_epochs: # number of initial training epochs
+            type: float
+            default: 20
+          num_main_epochs: # (maximum) number of training epochs
+            type: float
+            default: 200
+          patience: # how many increases in validation loss to go before early stopping of training for main model (to prevent overfitting)
+            type: float
+            default: 3
+          meta_learning_rate_initial: # learning rate for outer (meta) model (used in meta-training) for initial model
+            type: float
+            default: 0.001
+          base_learning_rate_initial: # learning rate for inner (base) model (used in both meta-training and meta-testing) for initial model
+            type: float
+            default: 0.0001
+          meta_learning_rate_global_main: # learning rate for global (meta) model (used in meta-training) for main model
+            type: float
+            default: 0.001
+          meta_learning_rate_group_main: # learning rate for group (meta) model (used in meta-training) for main model
+            type: float
+            default: 0.001
+          base_learning_rate_main: # learning rate for inner (base) model (used in both meta-training and meta-testing) for main model
+            type: float
+            default: 0.0001
+          num_base_steps: # number of SGD steps for base learner
+            type: float
+            default: 2
+          prior_sigma_1: # prior sigma 1 on the mixture prior distribution
+            type: float
+            default: 0.1
+          prior_sigma_2: # prior sigma 2 on the mixture prior distribution
+            type: float
+            default: 0.4
+          prior_pi: # pi on the scaled mixture prior
+            type: float
+            default: 1.0
+          lambda: # pi on the scaled mixture prior
+            type: float
+            default: 0.01
+      command: "python3 model/main.py --datafile {datafile} --num_groups {num_groups} --inference_type {inference_type} --interventional_option {interventional_option} --outprefix {outprefix} --task {task} --hidden_layer_size {hidden_layer_size} --num_initial_epochs {num_initial_epochs} --num_main_epochs {num_main_epochs} --patience {patience} --meta_learning_rate_initial {meta_learning_rate_initial} --base_learning_rate_initial {base_learning_rate_initial} --meta_learning_rate_global_main {meta_learning_rate_global_main} --meta_learning_rate_group_main {meta_learning_rate_group_main} --base_learning_rate_main {base_learning_rate_main} --num_base_steps {num_base_steps} --prior_sigma_1 {prior_sigma_1} --prior_sigma_2 {prior_sigma_2} --prior_pi {prior_pi} --lambda {lambda} --unknown_causal_models"
