@@ -1,6 +1,6 @@
 # Causal Similarity-Based Hierarchical Bayesian Models
 
-This repository contains the implementation of the machine learning model and experiments as described in the research paper Causal Similarity-Based Hierarchical Bayesian Models.
+This repository contains the implementation of the machine learning model and experiments as described in the research paper [Causal Similarity-Based Hierarchical Bayesian Models](https://arxiv.org/abs/2310.12595).
 
 ## Citation
 
@@ -10,7 +10,7 @@ If you find this code useful in your research, please consider citing:
 @article{wharrie2023causal,
   title={Causal Similarity-Based Hierarchical Bayesian Models},
   author={Wharrie, Sophie and Kaski, Samuel},
-  journal={arXiv preprint},
+  journal={arXiv preprint arXiv:2310.12595},
   year={2023},
 }
 ```
