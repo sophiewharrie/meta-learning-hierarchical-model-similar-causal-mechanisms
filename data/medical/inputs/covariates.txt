@@ -1,6 +1,24 @@
 Variable,Code,Type,Description
 covariate,31,static,Sex
 covariate,34,static,Year of birth
+diagnosis,130708,static,E11 T2D
+diagnosis,132198,static,O22 DVT
+diagnosis,131400,static,I82 DVT
+diagnosis,131394,static,I79 AAA
+diagnosis,131382,static,I71 AAA
+diagnosis,131378,static,I69 Stroke
+diagnosis,131374,static,I67 Stroke
+diagnosis,131372,static,I66 Stroke
+diagnosis,131366,static,I63 Stroke
+diagnosis,131058,static,G46 Stroke
+diagnosis,131306,static,I25 CAD
+diagnosis,131304,static,I24 CAD
+diagnosis,131302,static,I23 CAD
+diagnosis,131300,static,I22 CAD
+diagnosis,131298,static,I21 CAD
+diagnosis,131296,static,I20 CAD
+clinical,44P5.,read2,HDL
+clinical,44P5.,read3,HDL
 clinical,2469.,read2,SBP
 clinical,2469.,read3,SBP
 clinical,246A,read2,DBP
@@ -20,7 +38,5 @@ clinical,44J3.,read2,Creatinine
 clinical,XE2q5,read3,Creatinine
 clinical,44Q..,read2,Triglycerides
 clinical,XE2q9,read3,Triglycerides
-diagnosis,130708,static,E11 T2D
-diagnosis,131306,static,I25 Heart disease
-diagnosis,131366,static,I63 Stroke
-diagnosis,131298,static,I21 Heart attack
+clinical,44P..,read2,Cholesterol
+clinical,XE2eD,read3,Cholesterol

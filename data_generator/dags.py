@@ -14,30 +14,13 @@ def apply_graph_constraints(A_t, G_ref):
     """
     G_t = make_graph(A_t, G_ref)
 
-    T_nodes = [v for v in G_t.nodes() if v.startswith('T')]
-    
     # no self edges
     G_t.remove_edges_from(nx.selfloop_edges(G_t))
 
     # no Y --> edges
     for edge in list(G_t.out_edges('Y')):
         G_t.remove_edge(edge[0], edge[1])
-
-    for T in T_nodes:
-        node_remove = []
-        for path in [l for l in nx.all_simple_paths(G_t, source=T, target='Y')]:
-            # remove Tn --> Tm edges
-            if path[1].startswith('T'): node_remove.append(path[1])
-            # remove Tn --> X if an X --> Tm path exists
-            if 'T' in [p[0] for p in path[1:]]: node_remove.append(path[1])
-        for node in list(set(node_remove)):
-            G_t.remove_edge(T, node)
-
-    # if there is no T --> ... --> Y path then add a direct T --> Y path
-    for T in T_nodes:
-        if len([l for l in nx.all_simple_paths(G_t, source=T, target='Y')])==0:
-            G_t.add_edge(T, 'Y')
-
+    
     return nx.to_numpy_array(G_t)
 
 

@@ -1,3 +1,0 @@
-Code,Type
-44P6.,read2
-44P6.,read3

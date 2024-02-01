@@ -1,19 +1,6 @@
-# Causal Similarity-Based Hierarchical Bayesian Models
+# Meta-learning with hierarchical models based on similarity of causal mechanisms
 
-This repository contains the implementation of the machine learning model and experiments as described in the research paper [Causal Similarity-Based Hierarchical Bayesian Models](https://arxiv.org/abs/2310.12595).
-
-## Citation
-
-If you find this code useful in your research, please consider citing:
-
-```
-@article{wharrie2023causal,
-  title={Causal Similarity-Based Hierarchical Bayesian Models},
-  author={Wharrie, Sophie and Kaski, Samuel},
-  journal={arXiv preprint arXiv:2310.12595},
-  year={2023},
-}
-```
+This repository contains the implementation of the machine learning model and experiments as described in the research paper `Meta-learning with hierarchical models based on similarity of causal mechanisms`.
 
 ## Directory Structure
 
@@ -67,27 +54,13 @@ pip install -r requirements.txt
 
 ### Dependencies
 
-The primary dependencies include:
-- blitz-bayesian-pytorch==0.2.8
-- cdt==0.6.0
-- higher==0.2.1
-- jax==0.4.11
-- matplotlib==3.8.0
-- mlflow==2.3.2
-- networkx==3.1
-- numpy==1.24.4
-- numpyro==0.12.1
-- pandas==2.1.1
-- pyemd==1.0.0
-- scikit-learn==1.3.1
-- scipy==1.11.3
-- torch==2.0.1
+Please refer to `requirements.txt` to recreate the environment used in experiments.
 
-Please refer to `requirements.txt` for a complete list.
+You will also need to clone this fork of the DiBS package: TODO.
 
 ## Usage
 
-These instructions provide an example of how to run our method for Causal Similarity-Based Hierarchical Bayesian Models. The code implementation uses a Bayesian Neural Network (BNN) with 2 Bayesian linear layers for regression.
+These instructions provide an example of how to run our method for Meta-learning with hierarchical models based on similarity of causal mechanisms. The code implementation uses a Bayesian Neural Network (BNN) with 2 Bayesian linear layers for regression.
 
 ### Input Data Format
 
@@ -108,24 +81,26 @@ mkdir -p data/synthetic/output
 3. Generate a synthetic dataset using the MLproject entry point for generating synthetic data
 
 ```
-mlflow run . -e create_synthetic_dataset --env-manager=local --experiment-name=generate_synthetic_data -P outprefix=data/synthetic/output/test -P ref_input=data_generator/example_edgefile.txt -P seed=1234 -P N_train=20 -P N_val=5 -P N_test=10 -P M_train=5 -P M_test=5 -P C=2 -P sigma_ref=1.0 -P sigma_group=0.1 -P sigma_task=0.0001 -P sigma_noise=0.1 -P eta_group=0.6 -P eta_task=0.05
+mlflow run . -e create_synthetic_dataset --env-manager=local --experiment-name=generate_synthetic_data
 ```
 
-This creates a synthetic dataset with 20 train tasks, 5 validation tasks and 10 test tasks, for 2 groups of causally similar tasks. Each task has 5 support samples and 5 query samples. Please refer to the MLproject file and the paper for further details about what the hyperparameters represent.
+This uses the default hyperparameter settings, but please refer to the MLproject file to change the hyperparameter settings. If you would like a minimal example (e.g., just to test if the code works on your machine), then change N_train, N_val and N_test to low values so that the data generation and meta-learning methods run faster.
 
 #### Using Your Own Dataset
 
 If you are using your own dataset, prepare your data in the following format:
 
-| X1 | X2 | ... | T1 | T2 | ... | Y | task | task_train | meta_train |
+| X1 | X2 | ... | Y | task | task_train | meta_train |
 |---|---|---|---|---|---|---|---|---|---|
 | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
 
-- Features (continuous or discrete values): the feature list consists of covariates variables (column names beginning with `X`) and intervention variables (column names beginning with `T`). Please note that the code has only been tested with binary intervention variables
+- Features (continuous or discrete values): column names beginning with `X`
 - Label (continuous values): the label column should be called `Y`
 - Task (ordinal values 0,1,...): each task is labelled with an index 0, 1, ..., in the `task` column
 - Train/validation/test split (values 0, 1 or 2): the `task_train` column specifies if a task is in the train (0), validation (1) or test (2) set
 - Support/query split (values 0 or 1): the `meta_train` column specifies which data samples are support (1) samples and query (0) samples
+
+Also provide an intervention mask file, with the same columns as the dataset. The feature columns should have binary values indicating if the feature is an intervention target for the data sample.
 
 If the causal models of the tasks are known, you can also also provide a file specifying the causal distances between each pair of tasks (otherwise, use the option for unknown causal models):
 
@@ -134,7 +109,9 @@ If the causal models of the tasks are known, you can also also provide a file sp
 | ... | ... | ... | ... | ... |
 
 - Task pairs: index the task pairs using the task IDs from the `task` column of the main data file
-- Causal distances: add a column for each causal distance metric you want to consider (SHD, SID, OD, ID, etc.), indicating the causal distance between `task1` and `task2`
+- Causal distances: add a column for each causal distance metric you want to consider (SHD, etc.), indicating the causal distance between `task1` and `task2`
+
+See the synthetic data generator for an example of the input formats.
 
 ### Running the Method
 
@@ -150,26 +127,13 @@ source experiment_env/bin/activate
 mkdir -p experiments/output/test
 ```
 
-#### Known Causal Models
-
-Run our method for known causal models using the MLproject entry point `our_method_known_causal_structure`:
+3, Run our method using the MLproject entry point `our_method_unknown_causal_structure`:
 
 ```
-mlflow run . -e our_method_known_causal_structure --env-manager=local --experiment-name=method_causal_known -P datafile=data/synthetic/output/test_data.csv -P simfile=data/synthetic/output/test_causal_sim.csv -P num_groups=2 -P causal_distance=SHD -P outprefix=experiments/output/test/synthetic_known
+mlflow run . -e our_method_unknown_causal_structure --env-manager=local --experiment-name=method_causal_unknown
 ```
 
-In this example we use the Structural Hamming Distance (SHD) as the (known) causal distance. We have left most other hyperparameter settings on the default values, but please refer to the MLproject file and the paper for further details about what other hyperparameter settings are available.
-
-
-#### Unknown Causal Models
-
-Run our method for unknown causal models using the MLproject entry point `our_method_unknown_causal_structure`:
-
-```
-mlflow run . -e our_method_unknown_causal_structure --env-manager=local --experiment-name=method_causal_unknown -P datafile=data/synthetic/output/test_data.csv -P num_groups=2 -P inference_type=interventional -P outprefix=experiments/output/test/synthetic_unknown
-```
-
-In this example we use the Interventional Proxy (OP) as the proxy distance. We have left most other hyperparameter settings on the default values, but please refer to the MLproject file and the paper for further details about what other hyperparameter settings are available.
+This uses the default hyperparameter settings, but please refer to the MLproject file and the paper for further details about what other hyperparameter settings are available.
 
 ### Checking the Results
 
@@ -179,33 +143,11 @@ You can find the logs from each method run in the `mlruns` directory. See https:
 
 ## Reproducing Experiments From the Paper
 
-All experiments associated with the research paper can be found in the `experiments` directory. Each individual experiment has its own subdirectory, as listed below.
+All experiments associated with the research paper can be found in the `experiments` directory. Each experiment has its own subdirectory,
 
-### Experiment List
+## Datasets
 
-- `experiments/0_synthetic_data_validation/`: validation of the synthetic data quality and causal properties
-- `experiments/1_causal_heterogeneity/`: method comparison for synthetic datasets with varying degrees of causal heterogeneity and various causal distances
-- `experiments/2_alpha_analysis/`: analysis of the effect of causal distance hyperparameters for synthetic datasets
-- `experiments/3_N_m_analysis/`: analysis of the effect of N, M on generalisation for synthetic datasets
-- `experiments/4_real_data_experiment/`: method comparison experiment for real datasets
-- `experiments/5_interventional_ablation_study/`: ablation study of proxies for causal distances in real datasets
-- `experiments/6_complexity_analysis/`: analysis of our method's computational complexity
-
-### Datasets
-
-The following datasets are used in experiments:
-
-#### Synthetic Dataset
-
-We provide code for generating synthetic datasets according to the toy model described in the paper. See the `data_generator` directory for further details.
-
-#### Economics Dataset
-
-The economics dataset uses the IMF World Economic Outlook dataset, April 2023 version ([link to download](https://www.imf.org/en/Publications/WEO/weo-database/2023/April)), and Penn World Table dataset, version 10.01 ([link to download](https://www.rug.nl/ggdc/productivity/pwt/?lang=en)). See the `data/economics` directory for the preprocessing code and `data/README.md` for more details on the preprocessing steps.
-
-#### Medical Dataset
-
-The medical dataset uses the UK Biobank data resource. This dataset is not publicly available for download, but researchers can register with UK Biobank and apply for data access ([link to more details](https://www.ukbiobank.ac.uk/)). See the `data/medical` directory for the preprocessing code and `data/README.md` for more details on the preprocessing steps.
+All details for preparing the datasets used in experiments can be found in the `datasets` directory. Each dataset has its own subdirectory.
 
 
 ### Running Experiments on HPC using Slurm
@@ -251,11 +193,9 @@ Navigate through the notebook cells to visualize results, and generate the table
 
 ## Acknowledgements
 
-This study has received funding from the European Union's Horizon 2020 research and innovation programme under grant agreement No 101016775. This research has been conducted using the UK Biobank Resource under Application Number 77565.
-
 We acknowledge the following code packages and repositories that were especially useful for carrying out our research:
-- [NumPyro](https://github.com/pyro-ppl/numpyro) and [Pyro](https://github.com/pyro-ppl/pyro)
+- [DiBS](https://github.com/larslorch/dibs)
 - [Higher](https://github.com/facebookresearch/higher)
 - [BLiTZ](https://github.com/piEsposito/blitz-bayesian-deep-learning/tree/master)
-- [PyEMD](https://github.com/wmayner/pyemd)
 - [Causal Discovery Toolbox](https://github.com/FenTechSolutions/CausalDiscoveryToolbox)
+- [NumPyro](https://github.com/pyro-ppl/numpyro) and [Pyro](https://github.com/pyro-ppl/pyro)

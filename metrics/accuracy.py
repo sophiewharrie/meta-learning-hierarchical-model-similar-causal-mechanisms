@@ -47,7 +47,7 @@ def calculate_metrics(y_pred, y_true, y_task, task_type='regression', metric_typ
 def regression_metrics(y_pred, y_true, metric_type='train', log=True):
     """Metrics for evaluating regression tasks
     """
-    # Mean squared error regression loss (smaller is better)
+    # Mean squared error regression loss
     rmse = mean_squared_error(y_true, y_pred, squared=False)
     if log: mlflow.log_metric(f"RMSE_task_{metric_type}",rmse)
     
@@ -59,16 +59,16 @@ def regression_metrics(y_pred, y_true, metric_type='train', log=True):
 def classification_metrics(y_pred, y_true, threshold=0.5, metric_type='train', log=True):
     """Metrics for evaluating classifcation tasks
     """
-    # F1 score (larger is better)
+    # F1 score 
     y_pred_bin = (y_pred >= threshold).astype(int) # convert to binary
     f1 = f1_score(y_true, y_pred_bin)
     if log: mlflow.log_metric(f"F1_task_{metric_type}",f1)
 
-    # AUC-ROC score (larger is better)
+    # AUC-ROC score
     aucroc = roc_auc_score(y_true, y_pred)
     if log: mlflow.log_metric(f"AUCROC_task_{metric_type}",aucroc)
     
-    # AUC-PRC score (larger is better)
+    # AUC-PRC score
     aucprc = average_precision_score(y_true, y_pred)
     if log: mlflow.log_metric(f"AUCPRC_task_{metric_type}",aucprc)
     
