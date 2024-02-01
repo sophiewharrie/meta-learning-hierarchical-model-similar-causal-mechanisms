@@ -56,7 +56,7 @@ pip install -r requirements.txt
 
 Please refer to `requirements.txt` to recreate the environment used in experiments.
 
-You will also need to clone this fork of the DiBS package: TODO.
+You will also need to clone this fork of the DiBS package: https://github.com/sophiewharrie/dibs.
 
 ## Usage
 
@@ -91,8 +91,8 @@ This uses the default hyperparameter settings, but please refer to the MLproject
 If you are using your own dataset, prepare your data in the following format:
 
 | X1 | X2 | ... | Y | task | task_train | meta_train |
-|---|---|---|---|---|---|---|---|---|---|
-| ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+|---|---|---|---|---|---|---|
+| ... | ... | ... | ... | ... | ... | ... |
 
 - Features (continuous or discrete values): column names beginning with `X`
 - Label (continuous values): the label column should be called `Y`
