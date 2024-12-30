@@ -1,79 +1,148 @@
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import f1_score
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import average_precision_score
 import numpy as np
-import mlflow
+from sklearn.metrics import f1_score, roc_auc_score, average_precision_score, matthews_corrcoef, mean_squared_error, precision_score, recall_score, brier_score_loss, confusion_matrix
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, precision_recall_curve, auc
+import pandas as pd
+from scipy import stats
 
 
-def calculate_metrics(y_pred, y_true, y_task, task_type='regression', metric_type='train', threshold=0.5):
+def task_classification_metrics(task_preds):
+    """Get classification metrics for each task
+
+    Assumes input is of form task_preds = {task_label : {y_actual: [], 'y_pred': []}}
+
+    Returns output of form task_metrics = {task_label : {metric: value}}
     """
-    A function to calculate metrics for a set of tasks and log using MLflow. 
-    Specify task_type as either `regression` or `classification`.
+    task_metrics = {}
 
-    Note that these metrics are calculated on point estimates (e.g. mean of posterior distribution)
-    so the inputs are 1D numpy arrays. Note that y_pred, y_true, y_task have the same dimension
-
-    Parameters:
-    y_pred (numpy array, continuous values): gives the predicted value (for classification give probability value)
-    y_true (numpy array, continuous for regression, binary for classification): gives the true values 
-    y_task (numpy array): gives task number of each value in y_pred (equivalently, y_true) 
-    task_type (string): calculate regression metrics if 'regression', or binary classification metrics if 'classification'
-    metric_type (string): `train` if calculating metric for the meta-train set or `test` if for meta-test set (for logging purposes)
-    threshold (default 0.5): binary classification threshold for probability that determines a 1 label 
-    """
-    metric_values = []
-    for task in np.unique(y_task):
-        y_pred_task = y_pred[y_task==task]
-        y_true_task = y_true[y_task==task]
-        if task_type=='regression':
-            task_metric = regression_metrics(y_pred_task, y_true_task, metric_type)
-        else:
-            task_metric = classification_metrics(y_pred_task, y_true_task, threshold, metric_type)
-        metric_values.append(task_metric)
+    for task_label in task_preds:
+        metrics = classification_metrics(task_preds[task_label]['y_pred'], task_preds[task_label]['y_actual'], task_preds[task_label]['y_pred_bin'])
+        task_metrics[task_label] = metrics
     
-    metric_names = list(metric_values[0].keys())
-    task_avgs = {}
+    return task_metrics
+
+
+def avg_task_classification_metrics(task_metrics):
+    """
+    Get average of classification metrics across tasks
+
+    Assumes input is of form task_metrics = {task_label : {metric: value}}
+
+    Assumes all tasks have exactly the same metrics
+
+    Returns output of form avg_metrics = {metric: value}
+    """
+    avg_metrics = {}
+
+    task_labels = list(task_metrics.keys())
+    metric_names = list(task_metrics[task_labels[0]].keys())
+
     for metric in metric_names:
-        task_avg = np.mean([task_metric[metric] for task_metric in metric_values])
-        label = f'{metric}_avg_{metric_type}'
-        print(f'{label}: {task_avg}')
-        mlflow.log_metric(label, task_avg)
-        task_avgs[f'{metric}_avg'] = task_avg
+        metric_values = [task_metrics[task_label][metric] for task_label in task_labels]
+        avg_metrics[metric] = np.mean(metric_values)
 
-    return task_avgs
+    return avg_metrics
 
 
-def regression_metrics(y_pred, y_true, metric_type='train', log=True):
-    """Metrics for evaluating regression tasks
+def classification_metrics(y_pred, y_true, y_pred_bin=None, threshold=0.50):
+    """Metrics for evaluating (binary) classifcation tasks
+
+    Assumes y_pred gives probabilities of 1 label and threshold specifies the cutoff for converting probabilities to binary values
     """
-    # Mean squared error regression loss
-    rmse = mean_squared_error(y_true, y_pred, squared=False)
-    if log: mlflow.log_metric(f"RMSE_task_{metric_type}",rmse)
+    if y_pred_bin is None: y_pred_bin = (y_pred >= threshold).astype(int) # convert to binary
     
-    metrics = {'RMSE':rmse}
+    f1 = f1_score(y_true, y_pred_bin, average='binary')
 
-    return metrics
+    precision = precision_score(y_true, y_pred_bin, average='binary')
 
-
-def classification_metrics(y_pred, y_true, threshold=0.5, metric_type='train', log=True):
-    """Metrics for evaluating classifcation tasks
-    """
-    # F1 score 
-    y_pred_bin = (y_pred >= threshold).astype(int) # convert to binary
-    f1 = f1_score(y_true, y_pred_bin)
-    if log: mlflow.log_metric(f"F1_task_{metric_type}",f1)
-
-    # AUC-ROC score
+    recall = recall_score(y_true, y_pred_bin, average='binary')
+    
     aucroc = roc_auc_score(y_true, y_pred)
-    if log: mlflow.log_metric(f"AUCROC_task_{metric_type}",aucroc)
-    
-    # AUC-PRC score
+
     aucprc = average_precision_score(y_true, y_pred)
-    if log: mlflow.log_metric(f"AUCPRC_task_{metric_type}",aucprc)
-    
-    metrics = {'F1':f1, 
+
+    mcc = matthews_corrcoef(y_true, y_pred_bin)
+
+    brier = brier_score_loss(y_true, y_pred)
+
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred_bin).ravel()
+
+    positive_rate = sum(y_pred_bin)/len(y_pred_bin) # the proportion of samples identified as positive (out of all samples, regardless of whether its correct or not)
+
+    metrics = {'F1':f1,
+               'Precision':precision,
+               'Recall':recall,
                'AUCROC':aucroc, 
-               'AUCPRC':aucprc}
+               'AUCPRC':aucprc, 
+               'MCC':mcc,
+               'Brier':brier,
+               'False Negative Rate': fn / (fn + tp),
+               'Specificity': tn / (tn + fp),
+               'Negative Predictive Value': tn / (tn + fn),
+               'True negatives':tn,
+               'False positives':fp, 
+               'False negatives':fn,
+               'True positives':tp,
+               'Positive rate':positive_rate}
     
     return metrics
+
+def compute_curves(task_preds, args): 
+    """Compute and save AUCROC and Precision-Recall curves for the task predictions. 
+    
+    Assumes input is of form task_preds = {task_label : {y_actual: [], 'y_pred': []}}
+    Saves the curves to output_prefix. 
+    """
+    all_labels = []
+    all_preds = []
+
+    for task_label in task_preds:
+        all_labels.extend(task_preds[task_label]['y_actual'])
+        all_preds.extend(task_preds[task_label]['y_pred'])
+
+    all_labels = np.array(all_labels)
+    all_preds = np.array(all_preds)
+
+    fpr, tpr, _ = roc_curve(all_labels, all_preds)
+    precision_curve, recall_curve, _ = precision_recall_curve(all_labels, all_preds)
+    roc_auc = auc(fpr, tpr)
+    pr_auc = auc(recall_curve, precision_curve)
+
+    plt.figure()
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.4f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve')
+    plt.legend(loc="lower right")
+    plt.savefig('{}_roc_curve.png'.format(args['outprefix']))
+    plt.close()
+
+    plt.figure()
+    plt.plot(recall_curve, precision_curve, color='blue', lw=2, label='PR curve (area = %0.4f)' % pr_auc)
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.legend(loc="upper right")
+    plt.savefig('{}_pr_curve.png'.format(args['outprefix']))
+    plt.close()
+
+def get_pred_table(task_preds):
+    all_task_preds = pd.DataFrame()
+
+    for task in task_preds:
+        task_pred = pd.DataFrame({'y_actual':task_preds[task]['y_actual'],
+                                'y_pred':task_preds[task]['y_pred'],
+                                'y_pred_bin':task_preds[task]['y_pred_bin'],
+                                'y_pred_entropy':task_preds[task]['y_pred_entropy'], 
+                                'aleatoric_uncertainty':task_preds[task]['aleatoric_uncertainty'],
+                                'epistemic_uncertainty':task_preds[task]['epistemic_uncertainty']})
+        
+        task_pred['task'] = task
+        task_pred['patient_ids'] = task_preds[task]['data_ids']
+
+        all_task_preds = pd.concat([all_task_preds, task_pred])
+
+    return all_task_preds

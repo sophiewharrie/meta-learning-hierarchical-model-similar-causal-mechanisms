@@ -1,6 +1,3 @@
 experiment_env
-data/medical/data
-data/synthetic/output
-experiments/output/test
-mlruns
-__pycache__
+results
+credentials

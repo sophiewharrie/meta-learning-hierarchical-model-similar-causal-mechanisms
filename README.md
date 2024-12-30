@@ -1,201 +1,207 @@
-# Meta-learning with hierarchical models based on similarity of causal mechanisms
+# Bayesian Meta-Learning for Improving Generalizability of Health Prediction Models With Similar Causal Mechanisms
 
-This repository contains the implementation of the machine learning model and experiments as described in the research paper `Meta-learning with hierarchical models based on similarity of causal mechanisms`.
+Code for the paper [Bayesian Meta-Learning for Improving Generalizability of Health Prediction Models With Similar Causal Mechanisms](https://arxiv.org/abs/2310.12595)
 
-## Directory Structure
+## Abstract
 
-Below is an overview of the main components and layout of this repository:
+![graphical_abstract.png](graphical_abstract.png)
 
+Machine learning strategies like multi-task learning, meta-learning, and transfer learning enable efficient adaptation of machine learning models to specific applications in healthcare, such as prediction of various diseases, by leveraging generalizable knowledge across large datasets and multiple domains. In particular, Bayesian meta-learning methods pool data across related prediction tasks to learn prior distributions for model parameters, which are then used to derive models for specific tasks. However, inter- and intra-task variability due to disease heterogeneity and other patient-level differences pose challenges of negative transfer during shared learning and poor generalizability to new patients. We introduce a novel Bayesian meta-learning approach that aims to address this in two key settings: (1) predictions for new patients (same population as the training set) and (2) adapting to new patient populations. Our main contribution is in modeling similarity between causal mechanisms of the tasks, for (1) mitigating negative transfer during training and (2) fine-tuning that pools information from tasks that are expected to aid generalizability. We propose an algorithm for implementing this approach for Bayesian deep learning, and apply it to a case study for stroke prediction tasks using electronic health record data. Experiments for the UK Biobank dataset as the training population demonstrated significant generalizability improvements compared to standard meta-learning, non-causal task similarity measures, and local baselines (separate models for each task). This was assessed for a variety of tasks that considered both new patients from the training population (UK Biobank) and a new population (FinnGen).
+
+### Citation (preprint)
 ```
-├── README.md               # Overview and instructions related to the repository
-├── LICENSE                 # Software license
-├── MLproject               # MLflow project configuration
-├── requirements.txt        # Python package dependencies
-│
-├── baselines/              # Implementations of baseline models
-│
-├── data/                   # Datasets and preprocessing scripts
-│
-├── data_generator/         # Scripts for generating synthetic data
-│
-├── experiments/            # Experiment configurations and result logs
-│
-├── metrics/                # Custom metrics used for model evaluation
-│
-├── model/                  # Main model implementation scripts
-│
-└── utils/                  # Utility scripts and helper functions
+@misc{wharrie2024bayesmetalearning,
+      title={Bayesian Meta-Learning for Improving Generalizability of Health Prediction Models With Similar Causal Mechanisms}, 
+      author={Sophie Wharrie and Lisa Eick and Lotta Mäkinen and Andrea Ganna and Samuel Kaski},
+      year={2024},
+      eprint={2310.12595},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2310.12595}, 
+}
 ```
 
+## Python setup
 
-## Requirements and Setup
+The Python dependencies are listed in `requirements.txt`. For example, to set this up in a virtual environment:
 
-### Python Virtual Environment
-
-To isolate the dependencies for this project, it's recommended to use a virtual environment. Here's how to set it up:
-
-#### Create a Virtual Environment
+1. Create a virtual environment
 
 ```
 python3 -m venv experiment_env
 ```
 
-#### Activate the Virtual Environment
+2. Activate the virtual environment
 
 ```
 source experiment_env/bin/activate
 ```
 
-#### Install the Dependencies
+3. Install the Python dependencies
 
 ```
 pip install -r requirements.txt
 ```
 
-### Dependencies
+### Weights & Biases
 
-Please refer to `requirements.txt` to recreate the environment used in experiments.
-
-You will also need to clone this fork of the DiBS package: https://github.com/sophiewharrie/dibs.
+The code uses [Weights & Biases](https://wandb.ai/site) for experiment tracking and hyperparameter tuning, which requires an account and API key. See the tutorial section below on options for running the code without Weights & Biases.
 
 ## Usage
 
-These instructions provide an example of how to run our method for Meta-learning with hierarchical models based on similarity of causal mechanisms. The code implementation uses a Bayesian Neural Network (BNN) with 2 Bayesian linear layers for regression.
+### Data inputs
 
-### Input Data Format
+**An example (toy dataset) is provided in the `data/example` directory.**
 
-#### Generating a Synthetic Dataset
+There are 4 files required as inputs (CSV-formatted):
+- **Main (tabular) data file (mainfile)**: contains data for the binary classification tasks (patient identifiers, labels for supervised learning, tabular machine learning features, patient cohort definitions)
+- **Longitudinal data file (longfile)**: contains additional longitudinal (time series) machine learning features (in sparse format)
+- **Metadata file (metafile)**: contains metadata describing the columns in the mainfile
+- **Task distance file (distfile)**: contains distances between pairs of tasks, used to derive (causal) task similarity weights
+    - **Important note: to reproduce the methods used in the paper experiments, see the code and instructions in the `causal_distances` directory of this repository**
 
-1. Make sure you have activated the virtual environment
+See below for details on preparing all four files:
+
+#### Mainfile
+
+This contains the main data for all `n` binary classification tasks (patient IDs, `k` tabular ML features, labels, cohorts):
+
+- `id` (int or string): a patient identifier column
+- `X1, X2, ..., Xk` (any numerical data type): (tabular) predictors for all tasks
+- `Y1, Y2, ...., Yn` (binary): labels to predict for each task
+    - The `n` tasks include both training and target tasks (note: it's possible to include the same task as both a training *and* target task)
+- `C1, C2, ..., Cn` (binary): cohorts for each task (a row with `Ci=1` means the patient in that row is used by task `i`, and `Ci=0` means they are excluded from that task)
+
+| id | X1 | X2 | ... | Xk | Y1 | Y2 | ... | Yn | C1 | C2 | ... | Cn |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|
+|...|...|...|...|...|...|...|...|...|...|...|...|...|
+|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|xxx|
+
+Additional notes:
+- You can use any column names in the mainfile. The mapping of column names to their column type will need to be specified in the metafile (see below). 
+- All tasks should have a corresponding `cohort` column. Cohorts can be used to define the patient cohort for each task (e.g, if you want to exclude some patients from the analysis of some tasks)
+
+#### Longfile
+
+The neural network implemented in the code uses an LSTM architecture and also expects a separate file for longitudinal (time series) machine learning features in sparse format:
+
+- `PATIENT_ID` (int or string): a patient identifier column (same as in mainfile)
+- `EVENT_YEAR` (int): year of the medical event 
+- `ENDPOINT` (string): the name of the medical event (e.g., ICD-10 code or other identifier)
+
+| PATIENT_ID | EVENT_YEAR | ENDPOINT |
+|---|---|---|
+|patient_x|2000|X4|
+|patient_x|2001|V6|
+|patient_x|1990|W4|
+|patient_x|1995|W4|
+|patient_y|2010|X5|
+|patient_y|2003|V9|
+|...|...|...|
+
+Additional notes:
+- The column headers *must* have the names `PATIENT_ID`, `EVENT_YEAR` and `ENDPOINT`
+- If using the scripts in this repository for preparing the distfile, `ENDPOINT`s should include *at least* all the tasks (both training and target tasks) from the mainfile as endpoints (using the column names as endpoint names), and can also include additional endpoints
+
+#### Metafile
+
+This file provides a list of `column_name`'s (in the same order they appear in the mainfile), and describes their `column_type`'s as either `patient_id`, `predictor`, `task_label`, `target_task`, or `cohort`:
+
+- `column_name`: the name of the column (same as it appears in the mainfile)
+- `column_type`: the type of column (`patient_id`, `predictor`, `task_label`, `target_task`, or `cohort`). The tasks `Y1, Y2, ..., Yn` have type `task_label` (training tasks) or `target_task` (target task)
+- `task_cohort`: the name of the task corresponding to the cohort (blank for the non-cohort columns)
+
+| column_name | column_type | task_cohort |
+|---|---|---|
+| id | patient_id | |
+| X1 | predictor | |
+| X2 | predictor | |
+|...|...|...|
+| Xk | predictor | |
+| Y1 | task_label | |
+| Y2 | task_label | |
+|...|...|...|
+| Yn | task_label | |
+| C1 | cohort | Y1 |
+| C2 | cohort | Y2 |
+|...|...|...|
+| Cn | cohort | Yn |
+
+Additional notes:
+- The rows in the metafile need to be ordered in the same order they appear as columns in the mainfile
+
+#### Distfile
+
+This is a table of distances between *all* pairs of tasks (including both training and target tasks); used to derive (causal) task similarity weights:
+
+- `task1` and `task2`: the names of the tasks in the pair
+- `value`: the distance value for the pair `(task1, task2)`, where lower values indicate more similar tasks
+
+| task1 | task2 | value |
+|---|---|---|
+| Y0 | Y0 | 0 | 
+| Y0 | Y1 | 0.4 | 
+| Y0 | Y2 | 0.3 | 
+|...|...|...|
+| Yn | Yn | 0 | 
+
+Additional notes:
+- The values *do not* need to be normalised between 0 and 1
+- Distances are *symmetric*, i.e., `d(task1, task2) = d(task2, task1)`
+- The number of rows in the distfile should be `n*n`, where `n` is the total number of tasks
+- The distance between the same task should be 0
+- **Important note: to reproduce the methods used in the paper experiments, see the code and instructions in the `causal_distances` directory of this repository**
+
+### Running the ML models
+
+In general, the models are run using the following Python command, replacing the placeholders with values for your input arguments. See the `method/main.py` file for details of the input arguments. Also see the tutorial below for how to apply this command to the example dataset.
 
 ```
-source experiment_env/bin/activate
+python3 ./method/main.py --tabular_datafile {tabular_datafile} --longitudinal_datafile {longitudinal_datafile} --metafile {metafile} --distancefile {distancefile} --outprefix {outprefix} --data_type {data_type} --learning_type {learning_type} --test_frac {test_frac} --query_frac {query_frac} --case_frac {case_frac} --batch_size {batch_size} --method {method} --random_seed {random_seed} --n_kfold_splits {n_kfold_splits} --minibatch_size {minibatch_size} --max_num_epochs {max_num_epochs} --num_mc_samples {num_mc_samples} --wandb_n_trials {wandb_n_trials} --wandb_eval {wandb_eval} --wandb_direction {wandb_direction} --wandb_key_file {wandb_key_file} --sweep_id_filename {sweep_id_filename} --wandb_project {wandb_project} --wandb_entity {wandb_entity} --mode {mode}
 ```
 
-2. Create a directory for the synthetic dataset
+#### Tutorial for example dataset
 
+There are two main ways of running the code - either using Weights & Biases for hyperparameter tuning or running the code without Weights & Biases and hyperparameter tuning (providing hard-coded hyperparameter values).
+
+The below commands give examples for both settings, for all machine learning methods and baselines presented in the paper.
+
+If using Weights & Biases, first add your API credentials to a text file (for example, `credentials/wandb_api_key.txt`) and give the filepath as a command argument below.
+
+Make sure the Python environment is activated before running the code below.
+
+**Without hyperparameter tuning:**
+
+1. First you need to edit `method/main.py` to replace the placeholder dictionaries (`best_params`) with your values
+1. Make sure the directory for the `outprefix` exists
+1. Run one or multiple of the following commands for your chosen model/s (example values for options are given below, replace to suit your needs):
+
+- Local baselines (separate models for each task): use `method bnn_baseline` and `mode debug`
 ```
-mkdir -p data/synthetic/output
+python3 ./method/main.py --tabular_datafile data/example/example_tabular_data.csv --longitudinal_datafile data/example/example_longitudinal_data.csv --metafile data/example/example_col_metadata.csv --distancefile data/example/example_causal_dist.csv --outprefix results/test_bnn_baseline --data_type sequence --learning_type transductive --test_frac 0.5 --query_frac 0.5 --case_frac 0.5 --batch_size 200 --method bnn_baseline --random_seed 42 --n_kfold_splits 2 --minibatch_size 5 --max_num_epochs 5 --num_mc_samples 10 --mode debug
 ```
-
-3. Generate a synthetic dataset using the MLproject entry point for generating synthetic data
-
+- Meta-learning baseline (without task similarity): use `method 2_level_hierarchical` and `mode debug`
 ```
-mlflow run . -e create_synthetic_dataset --env-manager=local --experiment-name=generate_synthetic_data
+python3 ./method/main.py --tabular_datafile data/example/example_tabular_data.csv --longitudinal_datafile data/example/example_longitudinal_data.csv --metafile data/example/example_col_metadata.csv --distancefile data/example/example_causal_dist.csv --outprefix results/test_metalearning_baseline --data_type sequence --learning_type transductive --test_frac 0.5 --query_frac 0.5 --case_frac 0.5 --batch_size 200 --method 2_level_hierarchical --random_seed 42 --n_kfold_splits 2 --minibatch_size 5 --max_num_epochs 5 --num_mc_samples 10 --mode debug
 ```
-
-This uses the default hyperparameter settings, but please refer to the MLproject file to change the hyperparameter settings. If you would like a minimal example (e.g., just to test if the code works on your machine), then change N_train, N_val and N_test to low values so that the data generation and meta-learning methods run faster.
-
-#### Using Your Own Dataset
-
-If you are using your own dataset, prepare your data in the following format:
-
-| X1 | X2 | ... | Y | task | task_train | meta_train |
-|---|---|---|---|---|---|---|
-| ... | ... | ... | ... | ... | ... | ... |
-
-- Features (continuous or discrete values): column names beginning with `X`
-- Label (continuous values): the label column should be called `Y`
-- Task (ordinal values 0,1,...): each task is labelled with an index 0, 1, ..., in the `task` column
-- Train/validation/test split (values 0, 1 or 2): the `task_train` column specifies if a task is in the train (0), validation (1) or test (2) set
-- Support/query split (values 0 or 1): the `meta_train` column specifies which data samples are support (1) samples and query (0) samples
-
-Also provide an intervention mask file, with the same columns as the dataset. The feature columns should have binary values indicating if the feature is an intervention target for the data sample.
-
-If the causal models of the tasks are known, you can also also provide a file specifying the causal distances between each pair of tasks (otherwise, use the option for unknown causal models):
-
-| task1 | task2 | causal_distance1 | causal_distance2 | ... |
-|---|---|---|---|---|
-| ... | ... | ... | ... | ... |
-
-- Task pairs: index the task pairs using the task IDs from the `task` column of the main data file
-- Causal distances: add a column for each causal distance metric you want to consider (SHD, etc.), indicating the causal distance between `task1` and `task2`
-
-See the synthetic data generator for an example of the input formats.
-
-### Running the Method
-
-1. Make sure you have activated the virtual environment
-
+- Meta-learning with task similarity: use `method 3_level_hierarchical` and `mode debug`
 ```
-source experiment_env/bin/activate
+python3 ./method/main.py --tabular_datafile data/example/example_tabular_data.csv --longitudinal_datafile data/example/example_longitudinal_data.csv --metafile data/example/example_col_metadata.csv --distancefile data/example/example_causal_dist.csv --outprefix results/test_metalearning_main --data_type sequence --learning_type transductive --test_frac 0.5 --query_frac 0.5 --case_frac 0.5 --batch_size 200 --method 3_level_hierarchical --random_seed 42 --n_kfold_splits 2 --minibatch_size 5 --max_num_epochs 5 --num_mc_samples 10 --mode debug
 ```
 
-2. Create a directory for the results
+4. Review the command line output and `outprefix` location for the results
 
-```
-mkdir -p experiments/output/test
-```
+**With hyperparameter tuning:**
 
-3, Run our method using the MLproject entry point `our_method_unknown_causal_structure`:
-
-```
-mlflow run . -e our_method_unknown_causal_structure --env-manager=local --experiment-name=method_causal_unknown
-```
-
-This uses the default hyperparameter settings, but please refer to the MLproject file and the paper for further details about what other hyperparameter settings are available.
-
-### Checking the Results
-
-Our code uses [MLflow](https://mlflow.org/) for parameter and metric tracking. Each time a method is run, relevant parameters, metrics, and artifacts are logged to MLflow. This ensures a consistent and organized way to monitor, compare, and reproduce results.
-
-You can find the logs from each method run in the `mlruns` directory. See https://mlflow.org/docs/latest/tracking.html for further instructions on how you can check the results using the tracking UI and/or terminal.
-
-## Reproducing Experiments From the Paper
-
-All experiments associated with the research paper can be found in the `experiments` directory. Each experiment has its own subdirectory,
-
-## Datasets
-
-All details for preparing the datasets used in experiments can be found in the `datasets` directory. Each dataset has its own subdirectory.
+See the instructions in the `experiments` directory for how to reproduce the experiments from the paper that use Weights & Biases for hyperparameter tunimg. These are designed to be run efficiently on GPU.
 
 
-### Running Experiments on HPC using Slurm
-
-To facilitate running our experiments on High Performance Computing (HPC) clusters, we provide Slurm scripts. Slurm is a job scheduler that enables the allocation of resources and execution of jobs on large clusters.
-
-Please see the `README.md` file in each experiment directory for detailed instructions. We summarise the main steps below.
-
-1. Activate the Python virtual environment for this repository
-
-```
-source experiment_env/bin/activate
-```
-
-2. Run the shell script (from the root directory of this repository) that submits the Slurm script
-
-```
-./experiments/{REPLACE-WITH-NAME-OF-EXPERIMENT-DIRECTORY}/experiment.sh
-```
-
-Please adapt the Slurm script parameters such as number of nodes, CPUs, and memory as per your HPC cluster specifications.
-
-### MLflow Integration with Experiments
-
-[MLflow](https://mlflow.org/) is an open-source platform to manage the end-to-end machine learning lifecycle. In our experiments, MLflow is integrated for parameter and metric tracking. Each time an experiment is run, relevant parameters, metrics, and artifacts are logged to MLflow. This ensures a consistent and organized way to monitor, compare, and reproduce results.
-
-Refer to our scripts to see specific details on how parameters and metrics are logged.
-
-### MLproject File
-
-MLflow's MLproject file defines the environment and entry points for methods (and baselines), along with parameters they accept. This makes it straightforward to share and reproduce experiments. In our repository, each method used in experiments has its own entry point in the MLproject file. 
-
-The Slurm scripts for the experiments handle the code for running methods from the MLproject file and specification of parameters. Please note that we do not provide the code for methods from other authors used in our experiments (due to licensing reasons), but the code from the original authors can be accessed at the following sources:
-
-- HSML [link to repository](https://github.com/huaxiuyao/HSML)
-- TSA-MAML [link to repository](https://github.com/Carbonaraa/TSA-MAML)
-
-### Jupyter Notebooks for Results Review
-
-After running an experiment, refer to the Jupyter Notebook file in the corresponding experiment directory to review the experiment results logged by MLflow.
-
-Navigate through the notebook cells to visualize results, and generate the tables and figures as presented in the paper. The notebooks provide an interactive environment to manipulate and delve deep into the research findings.
 
 ## Acknowledgements
 
 We acknowledge the following code packages and repositories that were especially useful for carrying out our research:
+- [Posteriors](https://github.com/normal-computing/posteriors)
 - [DiBS](https://github.com/larslorch/dibs)
-- [Higher](https://github.com/facebookresearch/higher)
-- [BLiTZ](https://github.com/piEsposito/blitz-bayesian-deep-learning/tree/master)
-- [Causal Discovery Toolbox](https://github.com/FenTechSolutions/CausalDiscoveryToolbox)
-- [NumPyro](https://github.com/pyro-ppl/numpyro) and [Pyro](https://github.com/pyro-ppl/pyro)
+- [TwoSampleMR (R package)](https://mrcieu.github.io/TwoSampleMR/articles/introduction.html)
+- [InvariantCausalPrediction (R package)](https://cran.r-project.org/web/packages/InvariantCausalPrediction/index.html)
